@@ -27,43 +27,125 @@ message(STATUS "Catkin pip PATH : $ENV{PATH}")
 # And WE DO NOT WANT to do it there. The user controls his bash environment independently of what runs in it.
 
 
-# Note : we need to install our fixups as normal requirements
-
-macro(catkin_pip_requirements_prefix requirements_txt )
-    message(STATUS "    ... Retrieving Pip requirements ${requirements_txt} into @CONFIGURE_PREFIX@...")
+# The core macro that execute a pip command passed as parameter (not as a string but as a list of args).
+# such as catkin_pip_command(python -m pip install -r /full/path/to/mypackage/requirements.txt /full/path/to/mypackage)
+# the command will be passed verbatim to execute_process.
+macro(catkin_pip_command)
+    string(REPLACE ";" " " pip_command_CMDSTR "${ARGV}")
+    message(STATUS "    ... Running ${pip_command_CMDSTR} ...")
 
     execute_process(
-      COMMAND ${CATKIN_PIP} -q install -r ${requirements_txt} --ignore-installed --prefix "@CONFIGURE_PREFIX@" --install-option "--install-layout=deb"
+      COMMAND ${ARGV}
       WORKING_DIRECTORY @CMAKE_CURRENT_SOURCE_DIR@
       RESULT_VARIABLE PIP_RESULT
       OUTPUT_VARIABLE PIP_VARIABLE
       ERROR_VARIABLE PIP_ERROR
     )
 
-    message(STATUS "    ... Done ... [${PIP_RESULT}]: ${PIP_VARIABLE}")
     if (PIP_RESULT)
-        message(STATUS "Command ${CATKIN_PIP} -q install -r ${requirements_txt} --ignore-installed --prefix \"@CONFIGURE_PREFIX@\" --install-option \"--install-layout=deb\" FAILED")
+        message(STATUS "    ... Error ... [${PIP_RESULT}]: ${PIP_VARIABLE}")
         message(FATAL_ERROR "${PIP_ERROR}")
+    else()
+        message(STATUS "    ... Success ... [${PIP_RESULT}]: ${PIP_VARIABLE}")
     endif()
 endmacro()
 
+#
+# Default pip command options that are the same on any workspace (or configured via @variable expansion)
+# Specific command options for a workspace can be set before including this file
+# Variables in \@ are meant to be replace on runtime (ie. not when configuring this file) by the corresponding macro
+#
+
+# command to install requirements independently the package (make sure the requirements file doesnt have any other option, like '-e')
+if ( NOT CATKIN_PIP_OPT_INSTALL_REQUIREMENTS)
+    set(CATKIN_PIP_OPT_INSTALL_REQUIREMENTS install -r \@requirements_arg\@ --prefix "@CONFIGURE_PREFIX@" --install-option "--install-layout=deb")
+endif()
+
+if ( NOT CATKIN_PIP_OPT_INSTALL_PACKAGE )
+    set(CATKIN_PIP_OPT_INSTALL_PACKAGE -q install \@package_arg\@ --prefix "@CONFIGURE_PREFIX@" --install-option "--install-layout=deb")
+endif()
+
+if ( NOT CATKIN_PIP_OPT_INSTALL_REQUIREMENTS_AND_PACKAGE )
+    set(CATKIN_PIP_OPT_INSTALL_REQUIREMENTS_AND_PACKAGE -q install -r \@requirements_arg\@ \@package_arg\@ --prefix "@CONFIGURE_PREFIX@" --install-option "--install-layout=deb")
+endif()
+
+# these should be used internally only. catkin-pip decides if we force reinstall (install space - default) or not (devel - internal overrides).
+# but we need them here for catkin-pip's own setup.
+if ( NOT CATKIN_PIP_OPT_REINSTALL_REQUIREMENTS)
+    set(CATKIN_PIP_OPT_REINSTALL_REQUIREMENTS -q install --ignore-installed -r \@requirements_arg\@ --prefix "@CONFIGURE_PREFIX@" --install-option "--install-layout=deb")
+endif()
+
+if ( NOT CATKIN_PIP_OPT_REINSTALL_REQUIREMENTS_AND_PACKAGE )
+    set(CATKIN_PIP_OPT_REINSTALL_REQUIREMENTS_AND_PACKAGE -q install --ignore-installed -r \@requirements_arg\@ \@package_arg\@ --prefix "@CONFIGURE_PREFIX@" --install-option "--install-layout=deb")
+endif()
+
+#
+# End of Pip command options
+#
+
+# This macro is useful only if you want to install requirements file, without actually installing any package.
+# It might not support all pip options (like -e) form the requirements file.
+# To install the requirements file of a package, use catkin_pip_package macro instead.
+macro(catkin_pip_requirements_prefix requirements_path )
+    # to allow override cmd variables to use the configure_prefix
+    set(CONFIGURE_PREFIX @CONFIGURE_PREFIX@)
+    # Somehow, this is needed for string configure to work...
+    set(requirements_arg ${requirements_path})
+    # doing the extra expansion to get requirements_path
+    string(CONFIGURE "${CATKIN_PIP_OPT_INSTALL_REQUIREMENTS}" EXPANDED_CATKIN_PIP_OPT_INSTALL_REQUIREMENTS @ONLY)
+    # message(STATUS "EXPANDED_CATKIN_PIP_OPT_INSTALL_REQUIREMENTS ${EXPANDED_CATKIN_PIP_OPT_INSTALL_REQUIREMENTS}")
+    catkin_pip_command(${CATKIN_PIP} ${EXPANDED_CATKIN_PIP_OPT_INSTALL_REQUIREMENTS})
+endmacro()
+
 macro(catkin_pip_package_prefix package_path)
-    string(REPLACE ";" " " PIP_PACKAGE_INSTALL_CMDSTR "@PIP_PACKAGE_INSTALL_COMMAND@")
-    message(STATUS "    ... Running ${PIP_PACKAGE_INSTALL_CMDSTR} ...")
+    # to allow override cmd variables to use the configure_prefix
+    set(CONFIGURE_PREFIX @CONFIGURE_PREFIX@)
+    # Somehow, this is needed for string configure to work...
+    set(package_arg ${package_path})
+    # doing the extra expansion to get requirements_path
+    string(CONFIGURE "${CATKIN_PIP_OPT_INSTALL_PACKAGE}" EXPANDED_CATKIN_PIP_OPT_INSTALL_PACKAGE @ONLY)
+    # message(STATUS "EXPANDED_CATKIN_PIP_OPT_INSTALL_PACKAGE ${EXPANDED_CATKIN_PIP_OPT_INSTALL_PACKAGE}")
+    catkin_pip_command(${CATKIN_PIP} ${EXPANDED_CATKIN_PIP_OPT_INSTALL_PACKAGE})
+endmacro()
 
-    execute_process(
-      COMMAND @PIP_PACKAGE_INSTALL_COMMAND@
-      WORKING_DIRECTORY @CMAKE_CURRENT_SOURCE_DIR@
-      RESULT_VARIABLE PIP_RESULT
-      OUTPUT_VARIABLE PIP_VARIABLE
-      ERROR_VARIABLE PIP_ERROR
-    )
+macro(catkin_pip_requirements_package_prefix requirements_path package_path)
+    # to allow override cmd variables to use the configure_prefix
+    set(CONFIGURE_PREFIX @CONFIGURE_PREFIX@)
+    # Somehow, this is needed for string configure to work...
+    set(requirements_arg ${requirements_path})
+    set(package_arg ${package_path})
+    # doing the extra expansion to get requirements_path
+    string(CONFIGURE "${CATKIN_PIP_OPT_INSTALL_REQUIREMENTS_AND_PACKAGE}" EXPANDED_CATKIN_PIP_OPT_INSTALL_REQUIREMENTS_AND_PACKAGE @ONLY)
+    # message(STATUS "EXPANDED_CATKIN_PIP_OPT_INSTALL_REQUIREMENTS_AND_PACKAGE ${EXPANDED_CATKIN_PIP_OPT_INSTALL_REQUIREMENTS_AND_PACKAGE}")
+    catkin_pip_command(${CATKIN_PIP} ${EXPANDED_CATKIN_PIP_OPT_INSTALL_REQUIREMENTS_AND_PACKAGE})
+endmacro()
 
-    message(STATUS "    ... Done ... [${PIP_RESULT}]: ${PIP_VARIABLE}")
-    if (PIP_RESULT)
-        message(STATUS "Command ${PIP_PACKAGE_INSTALL_CMDSTR} FAILED !")
-        message(FATAL_ERROR "${PIP_ERROR}")
-    endif()
+# These should be used internally only. catkin-pip decides if we force reinstall (install space - default) or not (devel - internal overrides).
+# but we need them here for catkin-pip's own setup.
+
+# This macro does the same as catkin_pip_requirements_prefix, except that it forces reinstalling
+# this is needed when installing fixups for catkin pip
+macro(catkin_pip_reinstall_requirements_prefix requirements_path )
+    # to allow override cmd variables to use the configure_prefix
+    set(CONFIGURE_PREFIX @CONFIGURE_PREFIX@)
+    # Somehow, this is needed for string configure to work...
+    set(requirements_arg ${requirements_path})
+    # doing the extra expansion to get requirements_path
+    string(CONFIGURE "${CATKIN_PIP_OPT_REINSTALL_REQUIREMENTS}" EXPANDED_CATKIN_PIP_OPT_REINSTALL_REQUIREMENTS @ONLY)
+    # message(STATUS "EXPANDED_CATKIN_PIP_OPT_REINSTALL_REQUIREMENTS ${EXPANDED_CATKIN_PIP_OPT_REINSTALL_REQUIREMENTS}")
+    catkin_pip_command(${CATKIN_PIP} ${EXPANDED_CATKIN_PIP_OPT_REINSTALL_REQUIREMENTS})
+endmacro()
+
+macro(catkin_pip_reinstall_requirements_package_prefix requirements_path package_path)
+    # to allow override cmd variables to use the configure_prefix
+    set(CONFIGURE_PREFIX @CONFIGURE_PREFIX@)
+    # Somehow, this is needed for string configure to work...
+    set(requirements_arg ${requirements_path})
+    set(package_arg ${package_path})
+    # doing the extra expansion to get requirements_path
+    string(CONFIGURE "${CATKIN_PIP_OPT_REINSTALL_REQUIREMENTS_AND_PACKAGE}" EXPANDED_CATKIN_PIP_OPT_REINSTALL_REQUIREMENTS_AND_PACKAGE @ONLY)
+    # message(STATUS "EXPANDED_CATKIN_PIP_OPT_REINSTALL_REQUIREMENTS_AND_PACKAGE ${EXPANDED_CATKIN_PIP_OPT_REINSTALL_REQUIREMENTS_AND_PACKAGE}")
+    catkin_pip_command(${CATKIN_PIP} ${EXPANDED_CATKIN_PIP_OPT_REINSTALL_REQUIREMENTS_AND_PACKAGE})
 endmacro()
 
 
@@ -71,7 +153,8 @@ endmacro()
 # Careful this creates a CACHE variable
 find_program(CATKIN_PIP NAMES pip pip2 pip2.7 PATHS @CONFIGURE_PREFIX@/@CATKIN_GLOBAL_BIN_DESTINATION@ NO_DEFAULT_PATH)
 
-if (CATKIN_PIP)
+# Making sure we find pip and the executable is actually still there (and we didnt only get the value from cache)
+if (CATKIN_PIP AND EXISTS ${CATKIN_PIP})
     message(STATUS "    ... Catkin pip was found at ${CATKIN_PIP} ...")
 else ()
     # If not found, it means we need to do the whole setup...
@@ -92,25 +175,14 @@ else ()
     # Note --target here means we cannot check if a package is already installed or not before installing, using old pip.
     # which means we have to reinstall dependencies everytime and specify --exists-action w to avoid "already exists" errors
     # Avoid --install-option since the setuptools version found will be different the first time and the following times
-    execute_process(
-      COMMAND ${CATKIN_SYS_PIP} -q install -r "@CATKIN_PIP_REQUIREMENTS_PATH@/catkin-pip-base.req" --download-cache "${CMAKE_BINARY_DIR}/pip-cache" --target "@CONFIGURE_PREFIX@/${CATKIN_GLOBAL_PYTHON_DESTINATION}" --exists-action w
-      WORKING_DIRECTORY @CMAKE_CURRENT_SOURCE_DIR@
-      RESULT_VARIABLE PIP_RESULT
-      OUTPUT_VARIABLE PIP_VARIABLE
-      ERROR_VARIABLE PIP_ERROR
-    )
-
-    message(STATUS "    ... Done ... [${PIP_RESULT}]: ${PIP_VARIABLE}")
-    if (PIP_RESULT)
-        message(STATUS "Command ${CATKIN_SYS_PIP} -q install -r \"@CATKIN_PIP_REQUIREMENTS_PATH@/catkin-pip-base.req\" --download-cache \"${CMAKE_BINARY_DIR}/pip-cache\" --target \"@CONFIGURE_PREFIX@/${CATKIN_GLOBAL_PYTHON_DESTINATION}\" --exists-action w FAILED")
-        message(FATAL_ERROR "${PIP_ERROR}")
-    endif()
+    catkin_pip_command(${CATKIN_SYS_PIP} install -r "@CATKIN_PIP_REQUIREMENTS_PATH@/catkin-pip-base.req" --download-cache "${CMAKE_BINARY_DIR}/pip-cache" --target "@CONFIGURE_PREFIX@/${CATKIN_GLOBAL_PYTHON_DESTINATION}" --exists-action w)
 
     set(CATKIN_PIP python -m pip)  # to make sure we use our recently downloaded pip version (its entrypoints were not installed by old pip/setuptools)
     unset(CATKIN_SYS_PIP CACHE)  # we dont need this any longer
 
+    # Note : we need to install our fixups as normal requirements, ignoring whatever is already on the system
     # Fixing security since python 2.7.6 on trusty is broken : https://stackoverflow.com/questions/29099404/ssl-insecureplatform-error-when-using-requests-package
-    catkin_pip_requirements_prefix("@CATKIN_PIP_REQUIREMENTS_PATH@/catkin-pip-fixups.req")
+    catkin_pip_reinstall_requirements_prefix("@CATKIN_PIP_REQUIREMENTS_PATH@/catkin-pip-fixups.req")
 
     unset(CATKIN_PIP)
     # now we can finally use the simple "pip" entry_point (forcing cmake to find it)

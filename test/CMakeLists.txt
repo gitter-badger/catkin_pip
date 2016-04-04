@@ -11,21 +11,23 @@ find_package(catkin REQUIRED)
 include(../cmake/catkin-pip.cmake)
 
 # We need to install the common pip dependencies in the workspace being created
-catkin_pip_requirements(${CMAKE_CURRENT_SOURCE_DIR}/test_requirements.txt)
+# Since we dont want to compare with system installed packages (we cannot upgrade a system package here for example), better to reinstall everything in the workspace
+catkin_pip_reinstall_requirements_prefix(${CMAKE_CURRENT_SOURCE_DIR}/test_requirements.txt)
 
 message(STATUS "PATH $ENV{PATH}")
 
-# Make sure we get the right cookiecutter
-find_program( CATKIN_COOKIECUTTER NAMES cookiecutter PATHS ${CATKIN_DEVEL_PREFIX}/${CATKIN_GLOBAL_BIN_DESTINATION} NO_DEFAULT_PATH)
-if( NOT CATKIN_COOKIECUTTER )
+# Make sure we get cookiecutter
+# If we have already a system cookie cutter, we can use that one (provided that pip decided it fits our requirements)
+find_program( COOKIECUTTER NAMES cookiecutter PATHS ${CATKIN_DEVEL_PREFIX}/${CATKIN_GLOBAL_BIN_DESTINATION})
+if( NOT COOKIECUTTER )
     message( FATAL_ERROR "cookiecutter pip command not found. Make sure you have installed the cookiecutter pip package on your workspace.")
 else()
-    message(STATUS "cookiecutter found at ${CATKIN_COOKIECUTTER}")
+    message(STATUS "cookiecutter found at ${COOKIECUTTER}")
 endif()
 
 message(STATUS "    ... Getting cookiecutter-pipproject template from cookiecutter ...")
 execute_process(
-  COMMAND ${CATKIN_COOKIECUTTER} --no-input https://github.com/wdm0006/cookiecutter-pipproject.git
+  COMMAND ${COOKIECUTTER} --no-input https://github.com/wdm0006/cookiecutter-pipproject.git
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   RESULT_VARIABLE PIP_RESULT
   OUTPUT_VARIABLE PIP_VARIABLE

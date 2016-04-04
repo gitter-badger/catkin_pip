@@ -11,8 +11,9 @@ include(../cmake/catkin-pip.cmake)
 # find_package(catkin REQUIRED COMPONENTS catkin_pure_python)
 
 # We need to install the pip dependencies in the workspace being created
-catkin_pip_requirements(${PIP_PROJECT_DIR}/requirements.txt)
 # CAREFUL : all projects for test here will share the same workspace. pip might have conflicts...
+catkin_pip_requirements(${PIP_PROJECT_DIR}/requirements.txt)
+# note some dependencies here do not support the setuptools options passed when installing the pip package, so we need to use two macros for the setup.
 
 # defining current package as a package that should be managed by pip (not catkin - even though we make it usable with workspaces)
 catkin_pip_package(${PIP_PROJECT_DIR})
