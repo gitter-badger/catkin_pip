@@ -5,6 +5,26 @@ if ( NOT CATKIN_PIP_REQUIREMENTS_PATH )
     set (CATKIN_PIP_REQUIREMENTS_PATH ${CMAKE_CURRENT_LIST_DIR})
 endif()
 
+if ( NOT CATKIN_PIP_GLOBAL_PYTHON_DESTINATION )
+    # using site-packages as it s the default for pip and should also be used on debian systems for installs from non system packages
+    # Explanation here : http://stackoverflow.com/questions/9387928/whats-the-difference-between-dist-packages-and-site-packages
+    set (CATKIN_PIP_GLOBAL_PYTHON_DESTINATION "lib/python2.7/site-packages")
+endif()
+
+# _setup_util.py should already exist here.
+# catkin should have done the workspace setup before we reach here
+if ( EXISTS ${CATKIN_DEVEL_PREFIX}/_setup_util.py )
+    file(READ ${CATKIN_DEVEL_PREFIX}/_setup_util.py  SETUP_UTIL_PY)
+    string(REPLACE
+        "'PYTHONPATH': 'lib/python2.7/dist-packages',"
+        "'PYTHONPATH': ['lib/python2.7/dist-packages', '${CATKIN_PIP_GLOBAL_PYTHON_DESTINATION}']"
+        PATCHED_SETUP_UTIL_PY
+        ${SETUP_UTIL_PY}
+    )
+    file(WRITE ${CATKIN_DEVEL_PREFIX}/_setup_util.py  ${PATCHED_SETUP_UTIL_PY})
+else()
+    message(FATAL_ERROR "SETUP_UTIL.PY DOES NOT EXISTS YET ")
+endif()
 
 # Since we need (almost) the same configuration for both devel and install space, we create cmake files for each workspace setup.
 set(CONFIGURE_PREFIX ${CATKIN_DEVEL_PREFIX})
@@ -115,11 +135,11 @@ endmacro()
 # to allow the user to specify which version of program, provided by a catkin package he actually needs
 # We assume the version of the program
 macro(find_catkin_pip_package)
-    foreach(ARG ${ARGV})
-        if(STREQUAL ${arg} VERSION_MIN
-    endforeach()
+#    foreach(ARG ${ARGV})
+#        if(STREQUAL ${arg} VERSION_MIN)
+#    endforeach()
 
-    find_program(${ARGV})
+#    find_program(${ARGV})
 endmacro()
 
 # TODO :

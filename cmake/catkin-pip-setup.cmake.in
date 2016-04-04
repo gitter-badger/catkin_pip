@@ -6,11 +6,18 @@
 
 message(STATUS "Loading ${CMAKE_CURRENT_LIST_FILE}... ")
 
-# Make sure the pip target directory for the workspace is in python path
+# Make sure the catkin python package directory for the workspace is in python path
 # this is only needed if the user didn't source the current workspace setup.bash (happens the first time)
 string(FIND $ENV{PYTHONPATH} @CONFIGURE_PREFIX@/${CATKIN_GLOBAL_PYTHON_DESTINATION} FOUND_PPATH)
 if ( FOUND_PPATH LESS 0 )
     set(ENV{PYTHONPATH} "@CONFIGURE_PREFIX@/${CATKIN_GLOBAL_PYTHON_DESTINATION}:$ENV{PYTHONPATH}")
+endif()
+
+# Make sure the pip target directory for the workspace is in python path
+# this is only needed if the user didn't source the current workspace setup.bash (happens the first time)
+string(FIND $ENV{PYTHONPATH} @CONFIGURE_PREFIX@/@CATKIN_PIP_GLOBAL_PYTHON_DESTINATION@ FOUND_PPPATH)
+if ( FOUND_PPPATH LESS 0 )
+    set(ENV{PYTHONPATH} "@CONFIGURE_PREFIX@/@CATKIN_PIP_GLOBAL_PYTHON_DESTINATION@:$ENV{PYTHONPATH}")
 endif()
 
 # Make sure the bin target directory for the workspace is in system path
@@ -58,21 +65,21 @@ endmacro()
 
 # command to install requirements independently the package (make sure the requirements file doesnt have any other option, like '-e')
 if ( NOT CATKIN_PIP_OPT_INSTALL_REQUIREMENTS)
-    set(CATKIN_PIP_OPT_INSTALL_REQUIREMENTS install -r \@requirements_arg\@ --prefix "@CONFIGURE_PREFIX@" --install-option "--install-layout=deb")
+    set(CATKIN_PIP_OPT_INSTALL_REQUIREMENTS install -r \@requirements_arg\@ --prefix "@CONFIGURE_PREFIX@")
 endif()
 
 if ( NOT CATKIN_PIP_OPT_INSTALL_PACKAGE )
-    set(CATKIN_PIP_OPT_INSTALL_PACKAGE -q install \@package_arg\@ --prefix "@CONFIGURE_PREFIX@" --install-option "--install-layout=deb")
+    set(CATKIN_PIP_OPT_INSTALL_PACKAGE -q install \@package_arg\@ --prefix "@CONFIGURE_PREFIX@")
 endif()
 
 if ( NOT CATKIN_PIP_OPT_INSTALL_REQUIREMENTS_AND_PACKAGE )
-    set(CATKIN_PIP_OPT_INSTALL_REQUIREMENTS_AND_PACKAGE -q install -r \@requirements_arg\@ \@package_arg\@ --prefix "@CONFIGURE_PREFIX@" --install-option "--install-layout=deb")
+    set(CATKIN_PIP_OPT_INSTALL_REQUIREMENTS_AND_PACKAGE -q install -r \@requirements_arg\@ \@package_arg\@ --prefix "@CONFIGURE_PREFIX@")
 endif()
 
 # these should be used internally only. catkin-pip decides if we force reinstall (install space - default) or not (devel - internal overrides).
 # but we need them here for catkin-pip's own setup.
 if ( NOT CATKIN_PIP_OPT_REINSTALL_REQUIREMENTS)
-    set(CATKIN_PIP_OPT_REINSTALL_REQUIREMENTS -q install --ignore-installed -r \@requirements_arg\@ --prefix "@CONFIGURE_PREFIX@" --install-option "--install-layout=deb")
+    set(CATKIN_PIP_OPT_REINSTALL_REQUIREMENTS -q install --ignore-installed -r \@requirements_arg\@ --prefix "@CONFIGURE_PREFIX@")
 endif()
 
 if ( NOT CATKIN_PIP_OPT_REINSTALL_REQUIREMENTS_AND_PACKAGE )
@@ -168,8 +175,6 @@ else ()
     endif()
 
     message(STATUS "    ... Retrieving catkin_pure_python requirements using system pip ...")
-
-    file(MAKE_DIRECTORY @CONFIGURE_PREFIX@/${CATKIN_GLOBAL_PYTHON_DESTINATION})
 
     # We need to find a pip command that works for old pip versions (indigo supports trusty which is pip v1.5.4)
     # Note --target here means we cannot check if a package is already installed or not before installing, using old pip.
